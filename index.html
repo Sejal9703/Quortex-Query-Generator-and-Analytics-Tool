@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QueryGenius Analyst</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5; /* Light gray background */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to top */
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 1rem; /* Rounded corners */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); /* Soft shadow */
+            padding: 2rem;
+            max-width: 900px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .prompt-input {
+            border: 1px solid #d1d5db; /* Light gray border */
+            border-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            width: 100%;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .prompt-input:focus {
+            border-color: #3b82f6; /* Blue on focus */
+        }
+        .button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            color: #ffffff;
+        }
+        .button-primary {
+            background-color: #3b82f6; /* Blue */
+        }
+        .button-primary:hover {
+            background-color: #2563eb; /* Darker blue */
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+        .button-secondary {
+            background-color: #10b981; /* Green */
+        }
+        .button-secondary:hover {
+            background-color: #059669; /* Darker green */
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+        .result-card {
+            background-color: #f9fafb; /* Lighter gray background */
+            border: 1px solid #e5e7eb; /* Even lighter gray border */
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            white-space: pre-wrap; /* Preserve whitespace and wrap text */
+            word-wrap: break-word; /* Break long words */
+            line-height: 1.6;
+        }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .toast-message {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            z-index: 1000;
+        }
+        .toast-message.show {
+            opacity: 1;
+        }
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            cursor: pointer;
+        }
+        .file-input-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .file-input-label {
+            background-color: #6b7280; /* Gray */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .file-input-label:hover {
+            background-color: #4b5563; /* Darker gray */
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+    </style>
+    <!-- SheetJS CDN for Excel export -->
+    <script src="https://unpkg.com/xlsx-js-style@1.2.0/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-gray-800 text-center mb-4">QueryGenius Analyst</h1>
+        <p class="text-gray-600 text-center mb-6">
+            Enter a prompt (e.g., "calculate total monthly salary", "calculate total yearly salary for sales department", or "calculate invested loan amount given interest and profit").
+            You can also upload an Excel or CSV file to provide your own data. The tool will try to infer the correct data for your query.
+        </p>
+
+        <div class="input-group">
+            <label for="promptInput" class="text-gray-700 font-medium text-lg">Your Prompt:</label>
+            <textarea id="promptInput" class="prompt-input h-24 resize-none" placeholder="e.g., calculate total monthly salary"></textarea>
+            <button id="analyzeButton" class="button button-primary">
+                <span id="buttonText">Analyze & Generate</span>
+                <div id="loadingSpinner" class="loading-spinner ml-2 hidden"></div>
+            </button>
+        </div>
+
+        <div class="input-group mt-4">
+            <label for="fileInput" class="text-gray-700 font-medium text-lg">Upload Data (Optional Excel or CSV file):</label>
+            <div class="flex items-center gap-4">
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv">
+                    <label for="fileInput" class="file-input-label">Choose File</label>
+                </div>
+                <span id="fileNameDisplay" class="text-gray-500 text-sm">No file chosen</span>
+            </div>
+            <p class="text-gray-500 text-sm mt-2">
+                If uploading an Excel file, all sheets will be parsed. If uploading a CSV, it will be treated as a single dataset.
+                The tool will attempt to find relevant columns for your query within the uploaded data.
+            </p>
+        </div>
+
+        <div class="input-group">
+            <label for="analysisOutput" class="text-gray-700 font-medium text-lg">Prompt Analysis:</label>
+            <div id="analysisOutput" class="result-card min-h-[80px]"></div>
+        </div>
+
+        <div class="input-group">
+            <label for="resultsOutput" class="text-gray-700 font-medium text-lg">Calculated Results:</label>
+            <div id="resultsOutput" class="result-card min-h-[120px]"></div>
+        </div>
+
+        <div id="downloadButtonContainer" class="flex flex-col sm:flex-row gap-4 mt-4 hidden">
+            <button id="downloadExcelButton" class="button button-secondary flex-1">Download as Excel</button>
+            <button id="downloadCsvButton" class="button button-secondary flex-1">Download as CSV</button>
+        </div>
+    </div>
+
+    <div id="toastMessage" class="toast-message"></div>
+
+    <script>
+        const promptInput = document.getElementById('promptInput');
+        const analyzeButton = document.getElementById('analyzeButton');
+        const buttonText = document.getElementById('buttonText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const analysisOutput = document.getElementById('analysisOutput');
+        const resultsOutput = document.getElementById('resultsOutput');
+        const downloadButtonContainer = document.getElementById('downloadButtonContainer');
+        const downloadExcelButton = document.getElementById('downloadExcelButton');
+        const downloadCsvButton = document.getElementById('downloadCsvButton');
+        const toastMessage = document.getElementById('toastMessage');
+        const fileInput = document.getElementById('fileInput');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+
+        // Static data simulating a database
+        const staticEmployeeData = [
+            { id: 1, name: 'Alice Smith', department: 'Sales', monthlySalary: 5000, startDate: '2024-01-15' },
+            { id: 2, name: 'Bob Johnson', department: 'Marketing', monthlySalary: 4500, startDate: '2023-03-01' },
+            { id: 3, name: 'Charlie Brown', department: 'Sales', monthlySalary: 5200, startDate: '2024-02-10' },
+            { id: 4, name: 'Diana Miller', department: 'Engineering', monthlySalary: 7000, startDate: '2022-06-20' },
+            { id: 5, name: 'Eve Davis', department: 'Marketing', monthlySalary: 4800, startDate: '2024-04-05' },
+            { id: 6, name: 'Frank White', department: 'Sales', monthlySalary: 5100, startDate: '2023-11-25' },
+            { id: 7, name: 'Grace Taylor', department: 'Engineering', monthlySalary: 7500, startDate: '2023-01-10' },
+            { id: 8, name: 'Henry Wilson', department: 'HR', monthlySalary: 4000, startDate: '2024-05-01' },
+        ];
+
+        const staticLoanData = [
+            { id: 101, borrower: 'John Doe', principal: 100000, interestRate: 5, durationMonths: 60, profitEarned: 27628.16 },
+            { id: 102, borrower: 'Jane Roe', principal: 150000, interestRate: 4, durationMonths: 120, profitEarned: 33499.73 },
+            { id: 103, borrower: 'Peter Pan', principal: 50000, interestRate: 6, durationMonths: 36, profitEarned: 5283.65 },
+        ];
+
+        // New variable to hold all uploaded datasets
+        let uploadedDataSets = {}; // Stores { 'sheetName': [data_array], 'CSV_Data': [data_array] }
+
+        let currentAnalysis = {};
+        let currentResults = [];
+        let currentPrompt = '';
+
+        /**
+         * Displays a toast message to the user.
+         * @param {string} message - The message to display.
+         * @param {number} duration - How long the toast should be visible in ms.
+         */
+        function displayMessage(message, duration = 3000) {
+            toastMessage.textContent = message;
+            toastMessage.classList.add('show');
+            setTimeout(() => {
+                toastMessage.classList.remove('show');
+            }, duration);
+        }
+
+        /**
+         * Simulates Natural Language Understanding (NLU) to parse the user's prompt.
+         * This is a simplified keyword-based parsing.
+         * @param {string} prompt - The user's input prompt.
+         * @returns {object} An object containing the parsed intent and parameters.
+         */
+        function parsePrompt(prompt) {
+            const lowerPrompt = prompt.toLowerCase();
+            const parsed = {
+                intent: 'UNKNOWN',
+                entity: null,
+                timeframe: null,
+                filters: {},
+                parameters: {}
+            };
+
+            // Salary calculations
+            if (lowerPrompt.includes('salary')) {
+                parsed.entity = 'salary';
+                if (lowerPrompt.includes('total monthly')) {
+                    parsed.intent = 'CALCULATE_TOTAL_SALARY';
+                    parsed.timeframe = 'monthly';
+                } else if (lowerPrompt.includes('total quarterly')) {
+                    parsed.intent = 'CALCULATE_TOTAL_SALARY';
+                    parsed.timeframe = 'quarterly';
+                } else if (lowerPrompt.includes('total yearly')) {
+                    parsed.intent = 'CALCULATE_TOTAL_SALARY';
+                    parsed.timeframe = 'yearly';
+                } else if (lowerPrompt.includes('average monthly')) {
+                    parsed.intent = 'CALCULATE_AVERAGE_SALARY';
+                    parsed.timeframe = 'monthly';
+                }
+
+                // Department filter
+                const departmentMatch = lowerPrompt.match(/(for|in) the (sales|marketing|engineering|hr) department/);
+                if (departmentMatch) {
+                    parsed.filters.department = departmentMatch[2].charAt(0).toUpperCase() + departmentMatch[2].slice(1);
+                }
+            }
+            // Loan calculations
+            else if (lowerPrompt.includes('loan amount') && lowerPrompt.includes('interest') && lowerPrompt.includes('profit')) {
+                parsed.intent = 'CALCULATE_INVESTED_LOAN';
+                parsed.entity = 'loan';
+                // For this simulation, we assume interest rate and profit earned are already in the data
+            }
+
+            return parsed;
+        }
+
+        /**
+         * Attempts to find a suitable dataset from uploadedDataSets based on the prompt's entity.
+         * @param {string} entityType - 'salary' or 'loan'.
+         * @returns {Array|null} The relevant dataset or null if not found.
+         */
+        function findRelevantDataSet(entityType) {
+            const availableData = Object.values(uploadedDataSets);
+            if (availableData.length === 0) {
+                return null; // No uploaded data
+            }
+
+            // Define keywords for column headers for each entity type
+            const salaryKeywords = ['salary', 'monthlysalary', 'annualsalary', 'department', 'startdate', 'hiredate'];
+            const loanKeywords = ['loan', 'principal', 'interestrate', 'profit', 'borrower'];
+
+            for (const dataset of availableData) {
+                if (dataset.length === 0) continue;
+                const headers = Object.keys(dataset[0]).map(h => h.toLowerCase().replace(/\s+/g, '')); // Normalize headers
+
+                if (entityType === 'salary') {
+                    // Check for at least one salary keyword and one identifying keyword (like department or startdate)
+                    const hasSalaryMetric = headers.some(h => h.includes('salary') || h.includes('wage'));
+                    const hasIdentifyingCol = headers.some(h => h.includes('department') || h.includes('startdate') || h.includes('hiredate') || h.includes('name'));
+                    if (hasSalaryMetric && hasIdentifyingCol) {
+                        return dataset;
+                    }
+                } else if (entityType === 'loan') {
+                    // Check for common loan-related headers
+                    const hasPrincipal = headers.includes('principal') || headers.includes('loanamount');
+                    const hasInterest = headers.includes('interestrate') || headers.includes('interest');
+                    const hasProfit = headers.includes('profit') || headers.includes('profitearned');
+                    if (hasPrincipal && hasInterest && hasProfit) {
+                        return dataset;
+                    }
+                }
+            }
+            return null; // No suitable dataset found
+        }
+
+
+        /**
+         * Performs the requested calculation based on the parsed prompt.
+         * @param {object} parsedPrompt - The output from parsePrompt.
+         * @returns {object} An object containing the calculation result and formatted data for Excel.
+         */
+        function performCalculation(parsedPrompt) {
+            let resultText = "No calculation performed based on the prompt.";
+            let excelData = [];
+            let analysisSummary = "";
+
+            let employeeDataSource;
+            let loanDataSource;
+
+            // Try to use uploaded data first
+            if (parsedPrompt.entity === 'salary') {
+                employeeDataSource = findRelevantDataSet('salary');
+            } else if (parsedPrompt.entity === 'loan') {
+                loanDataSource = findRelevantDataSet('loan');
+            }
+
+            // Fallback to static data if no relevant uploaded data found
+            employeeDataSource = employeeDataSource || staticEmployeeData;
+            loanDataSource = loanDataSource || staticLoanData;
+
+
+            if (parsedPrompt.intent === 'CALCULATE_TOTAL_SALARY' || parsedPrompt.intent === 'CALCULATE_AVERAGE_SALARY') {
+                let filteredEmployees = employeeDataSource;
+
+                // Adjust column names to match common variations
+                const normalizeHeader = (header) => header ? header.toLowerCase().replace(/\s+/g, '') : '';
+                const findColumn = (obj, keywords) => {
+                    for (const key in obj) {
+                        if (keywords.some(kw => normalizeHeader(key).includes(kw))) {
+                            return key;
+                        }
+                    }
+                    return null;
+                };
+
+                const salaryCol = findColumn(filteredEmployees[0], ['salary', 'monthlysalary', 'wage', 'pay']);
+                const departmentCol = findColumn(filteredEmployees[0], ['department', 'dept']);
+                const startDateCol = findColumn(filteredEmployees[0], ['startdate', 'hiredate', 'joindate']);
+
+
+                if (!salaryCol || !startDateCol) {
+                    analysisSummary = "Could not find 'salary' or 'start date' related columns in the uploaded data for salary calculation. Using static data or defaulting to general error.";
+                    resultText = "Please ensure your uploaded data for salary calculations contains columns like 'monthlySalary' (or similar) and 'startDate' (or 'hireDate').";
+                    if (employeeDataSource === staticEmployeeData) { // If fallback used
+                        analysisSummary += "\nProceeding with static employee data for demonstration.";
+                        resultText = "Using static employee data for calculation:"; // Reset text to show static data calc
+                    } else {
+                        return { resultText, excelData, analysisSummary }; // If uploaded but insufficient, stop
+                    }
+                }
+
+                if (parsedPrompt.filters.department && departmentCol) {
+                    filteredEmployees = filteredEmployees.filter(emp => normalizeHeader(emp[departmentCol]) === normalizeHeader(parsedPrompt.filters.department));
+                }
+
+                if (filteredEmployees.length === 0) {
+                    resultText = "No employees found matching the criteria.";
+                    analysisSummary = "No data available for the specified filter.";
+                    return { resultText, excelData, analysisSummary };
+                }
+
+                const groupedByTime = {};
+                filteredEmployees.forEach(emp => {
+                    // Use the identified startDate column
+                    const dateVal = emp[startDateCol];
+                    const startDate = new Date(dateVal);
+
+                    if (isNaN(startDate.getTime())) {
+                        console.warn(`Invalid startDate for employee: ${dateVal}. Skipping for time-based aggregation.`);
+                        return; // Skip if date is invalid
+                    }
+
+                    let key;
+                    if (parsedPrompt.timeframe === 'monthly') {
+                        key = `${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}`;
+                    } else if (parsedPrompt.timeframe === 'quarterly') {
+                        const quarter = Math.floor(startDate.getMonth() / 3) + 1;
+                        key = `${startDate.getFullYear()}-Q${quarter}`;
+                    } else if (parsedPrompt.timeframe === 'yearly') {
+                        key = `${startDate.getFullYear()}`;
+                    } else {
+                        // If no timeframe, group all as 'Overall'
+                        key = 'Overall';
+                    }
+
+                    if (!groupedByTime[key]) {
+                        groupedByTime[key] = { total: 0, count: 0, employees: [] };
+                    }
+                    // Ensure salary is a number
+                    groupedByTime[key].total += parseFloat(emp[salaryCol]) || 0;
+                    groupedByTime[key].count++;
+                    groupedByTime[key].employees.push(emp[findColumn(emp, ['name', 'employeename', 'fullname']) || 'Unknown']); // Try to get employee name
+                });
+
+                let totalOverall = 0;
+                let countOverall = 0;
+                const excelRows = [];
+
+                Object.keys(groupedByTime).sort().forEach(key => {
+                    const periodTotal = groupedByTime[key].total;
+                    const periodCount = groupedByTime[key].count;
+                    totalOverall += periodTotal;
+                    countOverall += periodCount;
+
+                    if (parsedPrompt.intent === 'CALCULATE_TOTAL_SALARY') {
+                        resultText += `\n${parsedPrompt.timeframe ? parsedPrompt.timeframe.charAt(0).toUpperCase() + parsedPrompt.timeframe.slice(1) : 'Overall'} ${key}: $${periodTotal.toLocaleString()}`;
+                        excelRows.push({
+                            Period: key,
+                            [`Total ${parsedPrompt.timeframe || 'Overall'} Salary`]: periodTotal,
+                            'Employee Count': periodCount,
+                            'Employees': groupedByTime[key].employees.join(', ')
+                        });
+                    } else if (parsedPrompt.intent === 'CALCULATE_AVERAGE_SALARY') {
+                        const average = periodTotal / periodCount;
+                        resultText += `\n${parsedPrompt.timeframe ? parsedPrompt.timeframe.charAt(0).toUpperCase() + parsedPrompt.timeframe.slice(1) : 'Overall'} ${key} Average: $${average.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                        excelRows.push({
+                            Period: key,
+                            [`Average ${parsedPrompt.timeframe || 'Overall'} Salary`]: average,
+                            'Employee Count': periodCount,
+                            'Employees': groupedByTime[key].employees.join(', ')
+                        });
+                    }
+                });
+
+                analysisSummary = `Based on your request to ${parsedPrompt.intent.replace(/_/g, ' ').toLowerCase()} for ${parsedPrompt.filters.department ? parsedPrompt.filters.department + ' department ' : ''}on a ${parsedPrompt.timeframe || 'overall'} basis.`;
+                if (totalOverall > 0) {
+                    analysisSummary += `\n\nOverall, the total salary across all periods is $${totalOverall.toLocaleString()} for ${countOverall} records.`;
+                    if (parsedPrompt.intent === 'CALCULATE_AVERAGE_SALARY' && countOverall > 0) {
+                        analysisSummary += ` The overall average is $${(totalOverall / countOverall).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`;
+                    }
+                }
+                excelData = excelRows;
+
+            } else if (parsedPrompt.intent === 'CALCULATE_INVESTED_LOAN') {
+                analysisSummary = "Analyzing invested loan amounts based on provided interest and profit earned from our records.";
+                resultText = "Invested Loan Amounts and Details:\n";
+                excelData = [];
+
+                // Adjust column names for loan data
+                const normalizeHeader = (header) => header ? header.toLowerCase().replace(/\s+/g, '') : '';
+                const findColumn = (obj, keywords) => {
+                    for (const key in obj) {
+                        if (keywords.some(kw => normalizeHeader(key).includes(kw))) {
+                            return key;
+                        }
+                    }
+                    return null;
+                };
+
+                const principalCol = findColumn(loanDataSource[0], ['principal', 'loanamount']);
+                const interestRateCol = findColumn(loanDataSource[0], ['interestrate', 'interest']);
+                const profitEarnedCol = findColumn(loanDataSource[0], ['profit', 'profitearned']);
+                const borrowerCol = findColumn(loanDataSource[0], ['borrower', 'customername']);
+                const durationCol = findColumn(loanDataSource[0], ['duration', 'durationmonths', 'term']);
+
+
+                if (!principalCol || !interestRateCol || !profitEarnedCol) {
+                    analysisSummary = "Could not find 'principal', 'interest rate', or 'profit earned' related columns in the uploaded data for loan calculation. Using static data or defaulting to general error.";
+                    resultText = "Please ensure your uploaded data for loan calculations contains columns like 'principal', 'interestRate', and 'profitEarned' (or similar).";
+                     if (loanDataSource === staticLoanData) { // If fallback used
+                        analysisSummary += "\nProceeding with static loan data for demonstration.";
+                        resultText = "Using static loan data for calculation:"; // Reset text to show static data calc
+                    } else {
+                        return { resultText, excelData, analysisSummary }; // If uploaded but insufficient, stop
+                    }
+                }
+
+
+                loanDataSource.forEach(loan => {
+                    const principal = parseFloat(loan[principalCol]);
+                    const interestRate = parseFloat(loan[interestRateCol]);
+                    const profitEarned = parseFloat(loan[profitEarnedCol]);
+
+                    if (isNaN(principal) || isNaN(interestRate) || isNaN(profitEarned)) {
+                        console.warn(`Skipping loan entry due to invalid numeric data:`, loan);
+                        return;
+                    }
+
+                    const estimatedInvestedAmount = principal + profitEarned;
+
+                    resultText += `\nLoan ID: ${loan.id || 'N/A'}`;
+                    resultText += `\n  Borrower: ${loan[borrowerCol] || 'N/A'}`;
+                    resultText += `\n  Original Principal: $${principal.toLocaleString()}`;
+                    resultText += `\n  Stated Interest Rate: ${interestRate}%`;
+                    resultText += `\n  Total Profit Earned (simulated): $${profitEarned.toLocaleString()}`;
+                    resultText += `\n  Estimated Total Invested/Repaid (Principal + Profit): $${estimatedInvestedAmount.toLocaleString()}\n`;
+
+                    excelData.push({
+                        'Loan ID': loan.id || 'N/A',
+                        'Borrower': loan[borrowerCol] || 'N/A',
+                        'Original Principal': principal,
+                        'Interest Rate (%)': interestRate,
+                        'Duration (Months)': loan[durationCol] || 'N/A',
+                        'Total Profit Earned (Simulated)': profitEarned,
+                        'Estimated Total Invested/Repaid': estimatedInvestedAmount
+                    });
+                });
+                analysisSummary += `\n\nWe have analyzed ${loanDataSource.length} loan records. Each entry shows the original principal, the stated interest rate, and the recorded profit earned. The 'Estimated Total Invested/Repaid' column provides a simplified sum of principal and profit for quick reference, reflecting the total cash flow related to that loan based on our data.`;
+            } else {
+                analysisSummary = "I couldn't fully understand your prompt. Please try rephrasing it. Supported queries include salary calculations (monthly/quarterly/yearly total/average) and loan amount calculations based on interest and profit.";
+                resultText = "Please refine your prompt. For example:\n- calculate total monthly salary\n- calculate total yearly salary for sales department\n- calculate average monthly salary\n- calculate invested loan amount given interest and profit";
+            }
+
+            return { resultText, excelData, analysisSummary };
+        }
+
+        /**
+         * Exports the given data to an Excel file using xlsx-js-style.
+         * @param {Array<Object>} data - Array of objects to export.
+         * @param {string} fileName - The name of the Excel file.
+         */
+        function exportToExcel(data, fileName = 'analysis_results.xlsx') {
+            if (data.length === 0) {
+                displayMessage("No data to export to Excel.", 3000);
+                return;
+            }
+
+            const ws = XLSX.utils.json_to_sheet(data);
+
+            // Add header styling
+            const headerStyle = {
+                font: { bold: true, color: { rgb: "FFFFFF" } },
+                fill: { fgColor: { rgb: "3B82F6" } }, // Blue background
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                    top: { style: "thin", color: { rgb: "000000" } },
+                    bottom: { style: "thin", color: { rgb: "000000" } },
+                    left: { style: "thin", color: { rgb: "000000" } },
+                    right: { style: "thin", color: { rgb: "000000" } }
+                }
+            };
+
+            const dataStyle = {
+                border: {
+                    top: { style: "thin", color: { rgb: "D1D5DB" } },
+                    bottom: { style: "thin", color: { rgb: "D1D5DB" } },
+                    left: { style: "thin", color: { rgb: "D1D5DB" } },
+                    right: { style: "thin", color: { rgb: "D1D5DB" } }
+                },
+                alignment: { horizontal: "left", vertical: "top" }
+            };
+
+            // Apply styles to headers
+            const range = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : null;
+            if (range) {
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cellRef = XLSX.utils.encode_cell({ r: range.s.r, c: C });
+                    if (ws[cellRef]) {
+                        ws[cellRef].s = headerStyle;
+                    }
+                }
+
+                // Apply styles to data cells
+                for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                    for (let C = range.s.c; C <= range.e.c; ++C) {
+                        const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+                        if (ws[cellRef]) {
+                            ws[cellRef].s = dataStyle;
+                        }
+                    }
+                }
+
+                // Auto-width columns based on content
+                const colWidths = Object.keys(data[0]).map(key => ({
+                    wch: Math.max(
+                        key.length,
+                        ...data.map(item => String(item[key]).length)
+                    ) + 2 // +2 for a little padding
+                }));
+                ws['!cols'] = colWidths;
+            }
+
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Analysis Data");
+            XLSX.writeFile(wb, fileName);
+            displayMessage("Excel file downloaded successfully!", 3000);
+        }
+
+        /**
+         * Exports the given data to a CSV file.
+         * @param {Array<Object>} data - Array of objects to export.
+         * @param {string} fileName - The name of the CSV file.
+         */
+        function exportToCSV(data, fileName = 'analysis_results.csv') {
+            if (data.length === 0) {
+                displayMessage("No data to export to CSV.", 3000);
+                return;
+            }
+
+            const header = Object.keys(data[0]).join(',');
+            const rows = data.map(obj => Object.values(obj).map(val => {
+                // Handle potential commas and quotes in values for CSV
+                let processedVal = String(val);
+                if (processedVal.includes(',') || processedVal.includes('"') || processedVal.includes('\n')) {
+                    processedVal = `"${processedVal.replace(/"/g, '""')}"`;
+                }
+                return processedVal;
+            }).join(','));
+
+            const csvContent = [header, ...rows].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            if (link.download !== undefined) { // feature detection
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', fileName);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                displayMessage("CSV file downloaded successfully!", 3000);
+            }
+        }
+
+
+        // Event Listeners
+        analyzeButton.addEventListener('click', async () => {
+            currentPrompt = promptInput.value.trim();
+            if (!currentPrompt) {
+                displayMessage("Please enter a prompt.", 3000);
+                return;
+            }
+
+            // Show loading state
+            analyzeButton.disabled = true;
+            buttonText.textContent = 'Analyzing...';
+            loadingSpinner.classList.remove('hidden');
+            analysisOutput.textContent = 'Analyzing your request...';
+            resultsOutput.textContent = 'Calculating results...';
+            downloadButtonContainer.classList.add('hidden'); // Hide download buttons during analysis
+
+            // Simulate API call delay
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            const parsed = parsePrompt(currentPrompt);
+            const { resultText, excelData, analysisSummary } = performCalculation(parsed);
+
+            currentAnalysis = analysisSummary;
+            currentResults = excelData;
+
+            analysisOutput.textContent = analysisSummary;
+            resultsOutput.textContent = resultText;
+
+            // Hide loading state
+            analyzeButton.disabled = false;
+            buttonText.textContent = 'Analyze & Generate';
+            loadingSpinner.classList.add('hidden');
+
+            if (currentResults.length > 0) {
+                downloadButtonContainer.classList.remove('hidden'); // Show download buttons if there are results
+            } else {
+                downloadButtonContainer.classList.add('hidden');
+            }
+        });
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                fileNameDisplay.textContent = file.name;
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const fileExtension = file.name.split('.').pop().toLowerCase();
+                        let workbook;
+
+                        uploadedDataSets = {}; // Clear previous uploads
+
+                        if (fileExtension === 'csv') {
+                            const csvText = new TextDecoder().decode(data);
+                            workbook = XLSX.read(csvText, { type: 'string' });
+                            // For CSV, store the first sheet as a generic dataset
+                            if (workbook.SheetNames.length > 0) {
+                                const firstSheetName = workbook.SheetNames[0]; // This will typically be "Sheet1" for CSV
+                                uploadedDataSets['CSV_Data'] = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName]);
+                                displayMessage(`CSV file '${file.name}' loaded. Data available as 'CSV_Data'.`, 3000);
+                            } else {
+                                displayMessage("CSV file is empty.", 3000);
+                            }
+
+                        } else { // xlsx, xls
+                            workbook = XLSX.read(data, { type: 'array' });
+                            workbook.SheetNames.forEach(sheetName => {
+                                uploadedDataSets[sheetName] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                            });
+                            displayMessage(`Excel file '${file.name}' loaded. Sheets parsed: ${workbook.SheetNames.join(', ')}.`, 3000);
+                        }
+
+                        if (Object.keys(uploadedDataSets).length === 0) {
+                            displayMessage("No valid data parsed from the uploaded file. Using static data.", 5000);
+                            fileNameDisplay.textContent = "No valid data parsed.";
+                        } else {
+                           displayMessage("File loaded successfully! Uploaded data will be used for analysis.", 3000);
+                        }
+
+                    } catch (error) {
+                        displayMessage(`Error reading file: ${error.message}. Make sure it's a valid Excel or CSV.`, 5000);
+                        console.error("Error reading file:", error);
+                        fileNameDisplay.textContent = "Error reading file.";
+                        uploadedDataSets = {}; // Clear any partial data
+                    }
+                };
+                reader.onerror = (error) => {
+                    displayMessage(`Error reading file: ${error}`, 5000);
+                    console.error("FileReader error:", error);
+                    fileNameDisplay.textContent = "Error reading file.";
+                    uploadedDataSets = {};
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                fileNameDisplay.textContent = "No file chosen";
+                uploadedDataSets = {}; // Clear uploaded data when no file is chosen
+            }
+        });
+
+        downloadExcelButton.addEventListener('click', () => {
+            exportToExcel(currentResults, 'QueryGenius_Analysis.xlsx');
+        });
+
+        downloadCsvButton.addEventListener('click', () => {
+            exportToCSV(currentResults, 'QueryGenius_Analysis.csv');
+        });
+
+        // Initialize with default prompt for demonstration
+        promptInput.value = "calculate total monthly salary";
+        analyzeButton.click(); // Automatically analyze on load for first time users
+    </script>
+</body>
+</html>
